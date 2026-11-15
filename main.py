@@ -2,7 +2,7 @@
 # Flores Marcos - Lógica de Programación (CESUN)
 #
 # Versión integrada: el juego del cañón + música de fondo
-# + secuencia de imágenes de fondo que cambian cada 3 segundos.
+# + fondo synthwave (atardecer) con todo en estilo neón.
 #
 # Controles:
 #   Flecha arriba / abajo     -> cambia el ángulo del cañón
@@ -24,44 +24,56 @@ CONFIG = {
     "gravedad": 9.8,
     "escala": 10,          # pixeles por metro, para que se vea bien en pantalla
     "suelo": 660,          # altura (en Y) donde está el piso
-    "tiempo_cambio": 3000, # NUEVO: cada cuántos ms cambia la imagen de fondo
 }
 
 # ---------- Colores (tuplas RGB) ----------
-COLOR_FONDO = (25, 28, 40)
-COLOR_SUELO = (70, 90, 60)
-COLOR_CANON = (200, 200, 210)
-COLOR_BALA = (255, 200, 60)
-COLOR_OBJETIVO = (220, 60, 60)
-COLOR_TEXTO = (240, 240, 240)
-COLOR_TRAYECTORIA = (230, 230, 255)
+# NUEVO: paleta neón para que combine con el fondo synthwave
+ROSA = (255, 0, 200)
+CIAN = (0, 240, 255)
+AMARILLO = (255, 220, 60)
+NARANJA = (255, 140, 60)
+MORADO_OSCURO = (15, 0, 35)
+
+COLOR_SUELO = MORADO_OSCURO
+COLOR_CANON = CIAN
+COLOR_BALA = AMARILLO
+COLOR_OBJETIVO = ROSA
+COLOR_TEXTO = CIAN
+COLOR_TRAYECTORIA = AMARILLO
 
 # ---------- Estado del juego (variables que cambian) ----------
 POS_CANON = (120, CONFIG["suelo"])   # base del cañón
 LARGO_CANON = 70
 
 # NUEVO: archivos de Media
-ARCHIVOS_FONDO = [
-    "Media/img1_synthwave.png",
-    "Media/img2_galaxia.png",
-    "Media/img3_aurora.png",
-    "Media/img4_tunel.png",
-]
+FONDO = "Media/img1_synthwave.png"
 MUSICA = "Media/musica.mp3"
 
 # NUEVO: botones de música (chicos, en la esquina para no tapar el juego)
-BOTON_PLAY = pygame.Rect(CONFIG["ancho"] - 300, 20, 130, 45)
-BOTON_STOP = pygame.Rect(CONFIG["ancho"] - 155, 20, 130, 45)
+BOTON_PLAY = pygame.Rect(CONFIG["ancho"] - 340, 20, 150, 45)
+BOTON_STOP = pygame.Rect(CONFIG["ancho"] - 175, 20, 150, 45)
 
 
-def cargar_fondos():
-    """NUEVO: carga las imágenes en una lista y las ajusta al tamaño de la ventana."""
-    imagenes = []
-    for archivo in ARCHIVOS_FONDO:
-        img = pygame.image.load(archivo).convert()
-        img = pygame.transform.scale(img, (CONFIG["ancho"], CONFIG["alto"]))
-        imagenes.append(img)
-    return imagenes
+def cargar_fondo():
+    """NUEVO: carga la imagen del atardecer y la ajusta al tamaño de la ventana."""
+    img = pygame.image.load(FONDO).convert()
+    return pygame.transform.scale(img, (CONFIG["ancho"], CONFIG["alto"]))
+
+
+def brillo(screen, color, dibujar):
+    """NUEVO: efecto neón. Dibuja lo mismo en una capa transparente, más grueso,
+    para que parezca que brilla, y luego encima la versión normal."""
+    capa = pygame.Surface((CONFIG["ancho"], CONFIG["alto"]), pygame.SRCALPHA)
+    dibujar(capa, (*color, 70), 6)    # versión gruesa y transparente (el resplandor)
+    screen.blit(capa, (0, 0))
+    dibujar(screen, color, 0)         # versión normal encima
+
+
+def texto_neon(screen, fuente, texto, color, pos):
+    """NUEVO: texto con una sombra rosa detrás para que se vea tipo neón."""
+    sombra = fuente.render(texto, True, ROSA)
+    screen.blit(sombra, (pos[0] + 2, pos[1] + 2))
+    screen.blit(fuente.render(texto, True, color), pos)
 
 
 def nuevo_objetivo():
@@ -115,38 +127,45 @@ def fuera_de_pantalla(bala):
 
 
 def dibujar_botones(screen, fuente):
-    """NUEVO: botones para prender y apagar la música."""
-    pygame.draw.rect(screen, "green", BOTON_PLAY, border_radius=8)
-    pygame.draw.rect(screen, "red", BOTON_STOP, border_radius=8)
-    texto_play = fuente.render("Reproducir", True, "black")
-    texto_stop = fuente.render("Detener", True, "black")
-    screen.blit(texto_play, texto_play.get_rect(center=BOTON_PLAY.center))
-    screen.blit(texto_stop, texto_stop.get_rect(center=BOTON_STOP.center))
+    """NUEVO: botones neón para prender y apagar la música."""
+    for boton, texto, color in [(BOTON_PLAY, "Reproducir", CIAN), (BOTON_STOP, "Detener", ROSA)]:
+        pygame.draw.rect(screen, MORADO_OSCURO, boton, border_radius=8)
+        brillo(screen, color, lambda sup, c, extra: pygame.draw.rect(
+            sup, c, boton.inflate(extra * 2, extra * 2), 3 + extra, border_radius=8))
+        txt = fuente.render(texto, True, color)
+        screen.blit(txt, txt.get_rect(center=boton.center))
 
 
-def dibujar_escena(screen, fuente, fondo, sombra, angulo, velocidad, objetivo, bala, puntos, disparos, mensaje):
-    # NUEVO: en vez de un color liso, la imagen de fondo actual
+def dibujar_escena(screen, fuente, fondo, angulo, velocidad, objetivo, bala, puntos, disparos, mensaje):
+    # NUEVO: en vez de un color liso, la imagen del atardecer
     screen.blit(fondo, (0, 0))
-    # NUEVO: una capa oscura encima para que se lea bien el texto
-    screen.blit(sombra, (0, 0))
 
-    # suelo
+    # suelo: oscuro con una línea neón arriba
     pygame.draw.rect(screen, COLOR_SUELO,
                      (0, CONFIG["suelo"], CONFIG["ancho"], CONFIG["alto"] - CONFIG["suelo"]))
+    brillo(screen, ROSA, lambda sup, c, extra: pygame.draw.line(
+        sup, c, (0, CONFIG["suelo"]), (CONFIG["ancho"], CONFIG["suelo"]), 3 + extra))
 
-    # objetivo
-    pygame.draw.circle(screen, COLOR_OBJETIVO, (objetivo["x"], objetivo["y"]), objetivo["radio"])
-    pygame.draw.circle(screen, COLOR_TEXTO, (objetivo["x"], objetivo["y"]), objetivo["radio"] // 2, 2)
+    # objetivo: aro neón rosa con centro amarillo
+    centro = (objetivo["x"], objetivo["y"])
+    brillo(screen, COLOR_OBJETIVO, lambda sup, c, extra: pygame.draw.circle(
+        sup, c, centro, objetivo["radio"] + extra, 4 + extra))
+    pygame.draw.circle(screen, AMARILLO, centro, objetivo["radio"] // 3)
 
-    # cañón (base + tubo)
-    pygame.draw.circle(screen, COLOR_CANON, POS_CANON, 22)
-    pygame.draw.line(screen, COLOR_CANON, POS_CANON, punta_canon(angulo), 10)
+    # cañón (base + tubo) en cian
+    pygame.draw.circle(screen, MORADO_OSCURO, POS_CANON, 22)
+    brillo(screen, COLOR_CANON, lambda sup, c, extra: pygame.draw.circle(
+        sup, c, POS_CANON, 22 + extra, 4 + extra))
+    brillo(screen, COLOR_CANON, lambda sup, c, extra: pygame.draw.line(
+        sup, c, POS_CANON, punta_canon(angulo), 10 + extra))
 
     # trayectoria y bala
     if bala is not None:
         if len(bala["rastro"]) > 1:
-            pygame.draw.lines(screen, COLOR_TRAYECTORIA, False, bala["rastro"], 2)
-        pygame.draw.circle(screen, COLOR_BALA, (int(bala["x"]), int(bala["y"])), 7)
+            brillo(screen, COLOR_TRAYECTORIA, lambda sup, c, extra: pygame.draw.lines(
+                sup, c, False, bala["rastro"], 2 + extra))
+        brillo(screen, COLOR_BALA, lambda sup, c, extra: pygame.draw.circle(
+            sup, c, (int(bala["x"]), int(bala["y"])), 7 + extra))
 
     # texto de info
     lineas = [
@@ -157,13 +176,12 @@ def dibujar_escena(screen, fuente, fondo, sombra, angulo, velocidad, objetivo, b
     ]
     y = 20
     for linea in lineas:
-        texto = fuente.render(linea, True, COLOR_TEXTO)
-        screen.blit(texto, (20, y))
+        texto_neon(screen, fuente, linea, COLOR_TEXTO, (20, y))
         y += 30
 
     if mensaje:
-        txt = fuente.render(mensaje, True, COLOR_BALA)
-        screen.blit(txt, (CONFIG["ancho"] // 2 - txt.get_width() // 2, 160))
+        ancho_txt = fuente.size(mensaje)[0]
+        texto_neon(screen, fuente, mensaje, AMARILLO, (CONFIG["ancho"] // 2 - ancho_txt // 2, 160))
 
     dibujar_botones(screen, fuente)
 
@@ -174,19 +192,15 @@ def main():
     screen = pygame.display.set_mode((CONFIG["ancho"], CONFIG["alto"]))
     pygame.display.set_caption("Cañón Parabólico")
     clock = pygame.time.Clock()
-    fuente = pygame.font.SysFont(None, 28)
+    # NUEVO: letra tipo retro (si la Mac no tiene Menlo, usa otra monoespaciada)
+    fuente = pygame.font.SysFont("menlo,couriernew,monospace", 20, bold=True)
 
     # NUEVO: música que empieza sola y se repite
     pygame.mixer.music.load(MUSICA)
     pygame.mixer.music.play(-1)
 
-    # NUEVO: fondos y temporizador
-    fondos = cargar_fondos()
-    indice_fondo = 0
-    ultimo_cambio = pygame.time.get_ticks()
-    sombra = pygame.Surface((CONFIG["ancho"], CONFIG["alto"]))
-    sombra.fill((0, 0, 0))
-    sombra.set_alpha(90)   # 0 = transparente, 255 = negro total
+    # NUEVO: fondo del atardecer
+    fondo = cargar_fondo()
 
     angulo = 45
     velocidad = 60
@@ -235,12 +249,6 @@ def main():
             velocidad = max(velocidad - 1, 10)
 
         # ----- lógica -----
-        # NUEVO: cambiar el fondo cada 3 segundos
-        ahora = pygame.time.get_ticks()
-        if ahora - ultimo_cambio >= CONFIG["tiempo_cambio"]:
-            indice_fondo = (indice_fondo + 1) % len(fondos)
-            ultimo_cambio = ahora
-
         if bala is not None:
             actualizar_proyectil(bala, dt)
 
@@ -261,7 +269,7 @@ def main():
                 mensaje = ""
 
         # ----- dibujo -----
-        dibujar_escena(screen, fuente, fondos[indice_fondo], sombra, angulo, velocidad,
+        dibujar_escena(screen, fuente, fondo, angulo, velocidad,
                        objetivo, bala, puntos, disparos, mensaje)
         pygame.display.flip()
 
